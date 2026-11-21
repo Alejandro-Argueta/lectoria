@@ -197,204 +197,68 @@
 .reader-page:fullscreen .reader-text { max-width: 760px; margin-inline: auto; }
 
 
-/* Acciones de biblioteca */
-.book-card-wrap { position: relative; min-width: 0; }
-.book-card-wrap .book-card { width: 100%; }
-.delete-book {
-  position: absolute;
-  top: 7px;
-  right: 7px;
-  z-index: 2;
-  width: 30px;
-  height: 30px;
+/* LECTORIA: presentación de Continuar leyendo */
+#continueGrid {
+  align-items: start;
+}
+#continueGrid .continue-message {
+  grid-column: 1 / -1;
+  width: 100%;
+  max-width: 620px;
+  padding: 22px 24px;
+  border: 1px solid #ead8df;
+  border-radius: 12px;
+  background: #fffafb;
+  color: #69485a;
+  line-height: 1.55;
+}
+#continueGrid .continue-message strong {
+  display: block;
+  margin-bottom: 6px;
+  color: #493342;
+  font-size: 15px;
+}
+#continueGrid .continue-message p {
+  margin: 5px 0;
+  overflow-wrap: anywhere;
+}
+#continueGrid .continue-message small {
+  color: #8b7180;
+}
+#continueGrid .continue-card {
+  min-width: 0;
+  max-width: 190px;
+}
+#continueGrid .continue-progress {
+  margin-top: 10px;
   display: grid;
-  place-items: center;
-  border: 1px solid #ffffff8c;
-  border-radius: 50%;
-  background: #202833d9;
-  color: #fff;
-  font: 20px/1 'DM Sans', sans-serif;
-  cursor: pointer;
-  opacity: .92;
+  gap: 6px;
 }
-.delete-book:hover { background: #a83f3f; }
-.mobile-logout { display: none; }
-
+#continueGrid .continue-progress-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: #806879;
+  font-size: 11px;
+}
+#continueGrid .continue-progress-track {
+  height: 5px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: #eadde3;
+}
+#continueGrid .continue-progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #b77e9a;
+}
 @media (max-width: 760px) {
-  .mobile-logout {
-    display: flex !important;
-    flex: 0 0 58px !important;
-    font-size: 10px !important;
+  #continueGrid .continue-message {
+    padding: 18px;
+    max-width: none;
   }
-  .mobile-logout span { font-size: 17px !important; }
-  .sidebar { justify-content: space-between; }
-  .delete-book { width: 32px; height: 32px; top: 6px; right: 6px; }
-}
-
-
-/* LECTORIA · PALETA ROSA CLARO
-   Color de referencia: #E6BBCC. Complementos: marfil, ciruela y cacao. */
-:root {
-  --rose: #E6BBCC;
-  --rose-soft: #F4E4EA;
-  --rose-pale: #FAF2F5;
-  --rose-deep: #A96883;
-  --plum: #684456;
-  --plum-dark: #503344;
-  --ink: #30262C;
-  --muted: #8D7D85;
-  --paper: #FBF8F6;
-  --line: #EADDE2;
-}
-
-body { background: var(--paper); color: var(--ink); }
-.brand { color: var(--plum-dark); }
-.brand span { color: var(--rose-deep); }
-.eyebrow, .nav-label { color: #A77D8F; }
-
-.sidebar, .topbar { background: #FFFEFD; }
-.sidebar { border-color: var(--line); }
-.topbar { border-color: var(--line); }
-.nav-item { color: #786873; }
-.nav-item.active, .nav-item:hover {
-  background: var(--rose-soft);
-  color: var(--plum-dark);
-}
-.avatar { background: var(--rose-soft); color: var(--plum); }
-
-.primary {
-  background: var(--plum);
-  color: #fff;
-  transition: background .18s ease, transform .18s ease;
-}
-.primary:hover { background: var(--plum-dark); }
-.primary:active { transform: translateY(1px); }
-
-.login-card, .upload-panel {
-  background: #FFFEFD;
-  border-color: var(--line);
-}
-.login-card { box-shadow: 0 20px 60px #68445612; }
-.login-card input:focus, .toolbar input:focus, .settings select:focus {
-  outline: 2px solid var(--rose-deep);
-  outline-offset: 1px;
-  border-color: var(--rose-deep);
-}
-.toolbar input, .login-card input, .settings select {
-  border-color: #E6D9DF;
-  color: var(--ink);
-}
-.toolbar input::placeholder { color: #A4939C; }
-
-.book-card .cover {
-  background: linear-gradient(145deg, #B77F97 0%, #8B6178 54%, #65495C 100%);
-  box-shadow: 3px 7px 18px #68445620;
-}
-.book-card:hover .cover {
-  box-shadow: 0 10px 24px #6844562b;
-  transform: translateY(-2px);
-}
-.book-card .cover { transition: transform .18s ease, box-shadow .18s ease; }
-
-.dropzone {
-  border-color: #DAB7C6;
-  background: linear-gradient(180deg, #FFFEFD, #FCF5F8);
-}
-.dropzone.dragover {
-  background: var(--rose-pale);
-  border-color: var(--rose-deep);
-}
-.cloud { color: var(--rose-deep); }
-.file-row { border-color: var(--line); background: #FFFEFD; }
-
-.reader-page { background: #F8F2F0; }
-.reader-head { border-color: var(--line); }
-.quiet:hover { color: var(--plum-dark); background: var(--rose-soft); border-radius: 7px; }
-.reader-page[data-theme="sepia"] { background: #F2E5E2; }
-.reader-page[data-theme="dark"] { background: #282329; color: #F5EAF0; }
-.reader-page[data-theme="dark"] .reader-head {
-  background: #382D35;
-  color: #F5EAF0;
-  border-color: #51404B;
-}
-.reader-page[data-theme="dark"] .reader-text { color: #F0E4E9; }
-.settings {
-  border-color: var(--line);
-  box-shadow: 0 12px 35px #50334420;
-}
-.delete-book {
-  background: #503344e8;
-  border-color: #ffffffa6;
-}
-.delete-book:hover { background: #A33F59; }
-
-@media (max-width: 760px) {
-  .sidebar { background: #FFFEFD; border-top-color: var(--line); }
-  .sidebar .nav-item.active { background: var(--rose-soft); color: var(--plum-dark); }
-}
-
-
-/* LECTORIA COLOR FIX v2 */
-:root {
-  --lectoria-rose:#E6BBCC; --lectoria-rose-light:#F4E4EA;
-  --lectoria-rose-pale:#FBF3F6; --lectoria-plum:#684456;
-  --lectoria-plum-dark:#503344; --lectoria-ink:#30262C;
-  --lectoria-paper:#FBF8F6; --lectoria-line:#EADDE2;
-}
-html,body,.app,.main,.page { background-color:var(--lectoria-paper)!important; color:var(--lectoria-ink); }
-.sidebar,.topbar,.reader-head,.login-card,.upload-panel,.settings {
-  background-color:#FFFEFD!important; border-color:var(--lectoria-line)!important;
-}
-.brand,.brand:visited { color:var(--lectoria-plum-dark)!important; }
-.brand span { color:#B77F97!important; }
-.eyebrow,.nav-label { color:#A77D8F!important; }
-.nav-item.active,.nav-item:hover,.sidebar .nav-item.active {
-  background:var(--lectoria-rose-light)!important; color:var(--lectoria-plum-dark)!important;
-}
-.primary,button.primary { background:var(--lectoria-plum)!important; color:#fff!important; }
-.primary:hover,button.primary:hover { background:var(--lectoria-plum-dark)!important; }
-.avatar { background:var(--lectoria-rose-light)!important; color:var(--lectoria-plum)!important; }
-.toolbar input,.login-card input,.settings select { border-color:#E5D4DD!important; }
-.toolbar input:focus,.login-card input:focus,.settings select:focus {
-  outline:2px solid #B77F97!important; outline-offset:1px;
-}
-.book-grid .cover,.book-card .cover {
-  background:linear-gradient(145deg,#C58FA7 0%,#A8738D 52%,#684456 100%)!important;
-  box-shadow:3px 7px 18px #68445624!important;
-}
-.dropzone { border-color:#DAB7C6!important; background:linear-gradient(180deg,#FFFEFD,#FBF3F6)!important; }
-.dropzone.dragover { border-color:#A96883!important; background:#F4E4EA!important; }
-.cloud { color:#A96883!important; }
-.file-row { border-color:var(--lectoria-line)!important; background:#FFFEFD!important; }
-.reader-page { background:#F8F1F3!important; }
-.reader-page[data-theme="sepia"] { background:#F2E5E2!important; }
-.reader-page[data-theme="dark"] { background:#282329!important; color:#F5EAF0!important; }
-.reader-page[data-theme="dark"] .reader-head { background:#382D35!important; color:#F5EAF0!important; }
-.reader-page[data-theme="dark"] .reader-text { color:#F0E4E9!important; }
-.delete-book { background:#503344ed!important; }
-.delete-book:hover { background:#A33F59!important; }
-@media(max-width:760px) {
-  .sidebar { background:#FFFEFD!important; border-top-color:var(--lectoria-line)!important; }
-}
-
-/* FIX DEFINITIVO DE INTERACCIÓN: botón de eliminar por encima de la tarjeta */
-.book-card-wrap {
-  position: relative !important;
-  isolation: isolate !important;
-  overflow: visible !important;
-}
-.book-card-wrap > .book-card {
-  position: relative !important;
-  z-index: 1 !important;
-  pointer-events: auto !important;
-}
-.book-card-wrap > .delete-book {
-  position: absolute !important;
-  z-index: 1000 !important;
-  top: 7px !important;
-  right: 7px !important;
-  display: grid !important;
-  pointer-events: auto !important;
-  touch-action: manipulation !important;
-  cursor: pointer !important;
+  #continueGrid .continue-card {
+    max-width: none;
+  }
 }
