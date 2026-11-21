@@ -376,3 +376,25 @@ html,body,.app,.main,.page { background-color:var(--lectoria-paper)!important; c
 @media(max-width:760px) {
   .sidebar { background:#FFFEFD!important; border-top-color:var(--lectoria-line)!important; }
 }
+
+/* FIX DEFINITIVO DE INTERACCIÓN: botón de eliminar por encima de la tarjeta */
+.book-card-wrap {
+  position: relative !important;
+  isolation: isolate !important;
+  overflow: visible !important;
+}
+.book-card-wrap > .book-card {
+  position: relative !important;
+  z-index: 1 !important;
+  pointer-events: auto !important;
+}
+.book-card-wrap > .delete-book {
+  position: absolute !important;
+  z-index: 1000 !important;
+  top: 7px !important;
+  right: 7px !important;
+  display: grid !important;
+  pointer-events: auto !important;
+  touch-action: manipulation !important;
+  cursor: pointer !important;
+}
