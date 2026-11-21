@@ -332,3 +332,47 @@ body { background: var(--paper); color: var(--ink); }
   .sidebar { background: #FFFEFD; border-top-color: var(--line); }
   .sidebar .nav-item.active { background: var(--rose-soft); color: var(--plum-dark); }
 }
+
+
+/* LECTORIA COLOR FIX v2 */
+:root {
+  --lectoria-rose:#E6BBCC; --lectoria-rose-light:#F4E4EA;
+  --lectoria-rose-pale:#FBF3F6; --lectoria-plum:#684456;
+  --lectoria-plum-dark:#503344; --lectoria-ink:#30262C;
+  --lectoria-paper:#FBF8F6; --lectoria-line:#EADDE2;
+}
+html,body,.app,.main,.page { background-color:var(--lectoria-paper)!important; color:var(--lectoria-ink); }
+.sidebar,.topbar,.reader-head,.login-card,.upload-panel,.settings {
+  background-color:#FFFEFD!important; border-color:var(--lectoria-line)!important;
+}
+.brand,.brand:visited { color:var(--lectoria-plum-dark)!important; }
+.brand span { color:#B77F97!important; }
+.eyebrow,.nav-label { color:#A77D8F!important; }
+.nav-item.active,.nav-item:hover,.sidebar .nav-item.active {
+  background:var(--lectoria-rose-light)!important; color:var(--lectoria-plum-dark)!important;
+}
+.primary,button.primary { background:var(--lectoria-plum)!important; color:#fff!important; }
+.primary:hover,button.primary:hover { background:var(--lectoria-plum-dark)!important; }
+.avatar { background:var(--lectoria-rose-light)!important; color:var(--lectoria-plum)!important; }
+.toolbar input,.login-card input,.settings select { border-color:#E5D4DD!important; }
+.toolbar input:focus,.login-card input:focus,.settings select:focus {
+  outline:2px solid #B77F97!important; outline-offset:1px;
+}
+.book-grid .cover,.book-card .cover {
+  background:linear-gradient(145deg,#C58FA7 0%,#A8738D 52%,#684456 100%)!important;
+  box-shadow:3px 7px 18px #68445624!important;
+}
+.dropzone { border-color:#DAB7C6!important; background:linear-gradient(180deg,#FFFEFD,#FBF3F6)!important; }
+.dropzone.dragover { border-color:#A96883!important; background:#F4E4EA!important; }
+.cloud { color:#A96883!important; }
+.file-row { border-color:var(--lectoria-line)!important; background:#FFFEFD!important; }
+.reader-page { background:#F8F1F3!important; }
+.reader-page[data-theme="sepia"] { background:#F2E5E2!important; }
+.reader-page[data-theme="dark"] { background:#282329!important; color:#F5EAF0!important; }
+.reader-page[data-theme="dark"] .reader-head { background:#382D35!important; color:#F5EAF0!important; }
+.reader-page[data-theme="dark"] .reader-text { color:#F0E4E9!important; }
+.delete-book { background:#503344ed!important; }
+.delete-book:hover { background:#A33F59!important; }
+@media(max-width:760px) {
+  .sidebar { background:#FFFEFD!important; border-top-color:var(--lectoria-line)!important; }
+}
