@@ -70,33 +70,63 @@
       </button>${remove}</div>`;
   }
   function bindCards(container){
-    container.querySelectorAll('[data-book]').forEach(b=>b.addEventListener('click',()=>openBook(b.dataset.book)));
-    container.querySelectorAll('[data-delete-book]').forEach(b=>b.addEventListener('click',e=>{
-      e.stopPropagation(); deleteBook(b.dataset.deleteBook);
-    }));
+    // Delegación de eventos: sigue funcionando aunque las tarjetas se vuelvan a dibujar.
+    if(container.dataset.cardsBound === '1') return;
+    container.dataset.cardsBound = '1';
+    container.addEventListener('click', event => {
+      const deleteButton = event.target.closest('[data-delete-book]');
+      if(deleteButton && container.contains(deleteButton)){
+        event.preventDefault();
+        event.stopPropagation();
+        deleteBook(deleteButton.dataset.deleteBook);
+        return;
+      }
+      const bookButton = event.target.closest('[data-book]');
+      if(bookButton && container.contains(bookButton)){
+        event.preventDefault();
+        openBook(bookButton.dataset.book);
+      }
+    });
   }
 
   async function deleteBook(id){
-    if(!isAdmin()) return;
+    if(!isAdmin()){
+      window.alert('Tu cuenta no tiene permisos de administrador para eliminar libros.');
+      return;
+    }
     const book=books.find(item=>item.id===id);
-    if(!book) return;
+    if(!book){
+      window.alert('No se encontró el libro en la biblioteca. Actualiza la página e inténtalo de nuevo.');
+      return;
+    }
     const size=(book.file_size/1048576).toFixed(1);
-    if(!window.confirm(`¿Eliminar "${book.title}"?\n\nSe borrará el PDF de Supabase Storage y se liberarán aproximadamente ${size} MB. También se eliminará el progreso de lectura de ambas cuentas. Esta acción no se puede deshacer.`)) return;
+    if(!window.confirm(`¿Eliminar "${book.title}"?\\n\\nSe borrará el PDF de Supabase Storage y se liberarán aproximadamente ${size} MB. También se eliminará el progreso de lectura de ambas cuentas. Esta acción no se puede deshacer.`)) return;
 
-    const {error:storageError}=await supabase.storage.from('books').remove([book.storage_path]);
-    if(storageError){
-      window.alert(`No se pudo eliminar el archivo PDF: ${storageError.message}`);
-      return;
+    try {
+      const {error:storageError}=await supabase.storage.from('books').remove([book.storage_path]);
+      if(storageError){
+        console.error('Error eliminando PDF:',storageError);
+        window.alert(`Supabase no permitió eliminar el PDF: ${storageError.message}`);
+        return;
+      }
+      const {error:dbError}=await supabase.from('books').delete().eq('id',id);
+      if(dbError){
+        console.error('Error eliminando registro:',dbError);
+        window.alert(`El PDF se eliminó, pero falló el registro del libro: ${dbError.message}`);
+        return;
+      }
+      if(activeBook?.id===id){
+        activeBook=null;
+        show('readerPage',false);
+        navigate('library');
+      }
+      await loadBooks();
+      await renderContinue();
+      message('uploadStatus',`Libro eliminado. Se liberaron aproximadamente ${size} MB.`);
+    } catch(error) {
+      console.error('Fallo inesperado al eliminar libro:',error);
+      window.alert(`No se pudo completar la eliminación: ${error.message || error}`);
     }
-    const {error:dbError}=await supabase.from('books').delete().eq('id',id);
-    if(dbError){
-      window.alert(`El archivo se eliminó, pero no se pudo borrar el registro del libro: ${dbError.message}. Contacta al administrador para corregirlo.`);
-      return;
-    }
-    if(activeBook?.id===id){activeBook=null;show('readerPage',false);navigate('library');}
-    await loadBooks();
-    renderContinue();
-    message('uploadStatus',`Libro eliminado. Se liberaron aproximadamente ${size} MB.`);
   }
   function renderBooks(){
     const term=$('searchInput').value.toLowerCase();
