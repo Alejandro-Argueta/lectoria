@@ -57,7 +57,6 @@
     const {data,error}=await supabase.from('books').select('id,title,original_name,storage_path,file_size,created_at').order('created_at',{ascending:false});
     if(error){console.error(error);return;}
     books=data||[];renderBooks();
-    if(isAdmin() && $('storageAdminPanel')) await renderStorageAdmin();
   }
   function card(book){
     const remove = isAdmin()
@@ -97,20 +96,25 @@
     }
     const book=books.find(item=>item.id===id);
     if(!book){
-      window.alert('No se encontró el libro. Actualiza la página e inténtalo de nuevo.');
+      window.alert('No se encontró el libro en la biblioteca. Actualiza la página e inténtalo de nuevo.');
       return;
     }
-    const size=(Number(book.file_size||0)/1048576).toFixed(1);
-    if(!window.confirm(`¿Eliminar "${book.title}"?\\n\\nSe eliminará el PDF de Storage, el registro del libro y el progreso de lectura de ambas cuentas. Se liberarán aproximadamente ${size} MB.`)) return;
+    const size=(book.file_size/1048576).toFixed(1);
+    if(!window.confirm(`¿Eliminar "${book.title}"?\\n\\nSe borrará el PDF de Supabase Storage y se liberarán aproximadamente ${size} MB. También se eliminará el progreso de lectura de ambas cuentas. Esta acción no se puede deshacer.`)) return;
 
-    const buttons=[...document.querySelectorAll(`[data-delete-book="${CSS.escape(id)}"]`)];
-    buttons.forEach(button=>{button.disabled=true;button.textContent='…';});
-    try{
-      const {data,error}=await supabase.functions.invoke('lectoria-admin',{
-        body:{action:'delete_book',bookId:id}
-      });
-      if(error) throw error;
-      if(!data?.ok) throw new Error(data?.error || 'No se pudo eliminar el libro.');
+    try {
+      const {error:storageError}=await supabase.storage.from('books').remove([book.storage_path]);
+      if(storageError){
+        console.error('Error eliminando PDF:',storageError);
+        window.alert(`Supabase no permitió eliminar el PDF: ${storageError.message}`);
+        return;
+      }
+      const {error:dbError}=await supabase.from('books').delete().eq('id',id);
+      if(dbError){
+        console.error('Error eliminando registro:',dbError);
+        window.alert(`El PDF se eliminó, pero falló el registro del libro: ${dbError.message}`);
+        return;
+      }
       if(activeBook?.id===id){
         activeBook=null;
         show('readerPage',false);
@@ -118,75 +122,12 @@
       }
       await loadBooks();
       await renderContinue();
-      if(isAdmin()) await renderStorageAdmin();
-      window.alert(data.storageRemoved===false
-        ? 'El registro se eliminó, pero el PDF quedó pendiente de limpieza. Usa «Limpiar archivos huérfanos».'
-        : `Libro eliminado. Se liberaron aproximadamente ${size} MB.`);
-    }catch(error){
-      console.error('Error eliminando libro:',error);
-      window.alert(`No se pudo eliminar el libro: ${error.message || error}`);
-      buttons.forEach(button=>{button.disabled=false;button.textContent='×';});
+      message('uploadStatus',`Libro eliminado. Se liberaron aproximadamente ${size} MB.`);
+    } catch(error) {
+      console.error('Fallo inesperado al eliminar libro:',error);
+      window.alert(`No se pudo completar la eliminación: ${error.message || error}`);
     }
   }
-
-  async function renderStorageAdmin(){
-    const panel=$('storageAdminPanel');
-    if(!panel || !isAdmin()) return;
-    panel.classList.remove('hidden');
-    const status=$('storageAdminStatus');
-    status.textContent='Consultando almacenamiento…';
-    $('cleanupOrphansBtn').disabled=true;
-    try{
-      const {data,error}=await supabase.functions.invoke('lectoria-admin',{
-        body:{action:'storage_summary'}
-      });
-      if(error) throw error;
-      if(!data?.ok) throw new Error(data?.error || 'No se pudo consultar Storage.');
-      const mb=(Number(data.usedBytes||0)/1048576);
-      const quota=1024;
-      const pct=Math.min(100,mb/quota*100);
-      $('storageUsed').textContent=`${mb.toFixed(2)} MB`;
-      $('storageFiles').textContent=String(data.fileCount||0);
-      $('storageOrphans').textContent=String((data.orphans||[]).length);
-      $('storageProgress').style.width=`${pct}%`;
-      $('storageOrphanList').innerHTML=(data.orphans||[]).length
-        ? data.orphans.map(file=>`<li>${escapeHtml(file.name.split('/').pop())} <span>${(Number(file.size||0)/1048576).toFixed(2)} MB</span></li>`).join('')
-        : '<li class="storage-clean">No hay archivos huérfanos.</li>';
-      status.textContent='El consumo mostrado corresponde al bucket books. La cuota total de la organización puede incluir otros proyectos.';
-      $('cleanupOrphansBtn').disabled=!(data.orphans||[]).length;
-    }catch(error){
-      console.error('Error consultando almacenamiento:',error);
-      status.textContent=`No se pudo consultar Storage: ${error.message || error}. Verifica que la Edge Function lectoria-admin esté desplegada.`;
-      $('storageUsed').textContent='—';
-      $('storageFiles').textContent='—';
-      $('storageOrphans').textContent='—';
-      $('storageOrphanList').innerHTML='';
-    }
-  }
-
-  $('refreshStorageBtn').addEventListener('click',renderStorageAdmin);
-  $('cleanupOrphansBtn').addEventListener('click',async()=>{
-    if(!isAdmin()) return;
-    const count=Number($('storageOrphans').textContent)||0;
-    if(!count) return;
-    if(!window.confirm(`Se encontraron ${count} PDF sin registro en la biblioteca.\\n\\nSe eliminarán únicamente esos archivos huérfanos del bucket books. Los libros registrados no se tocarán. ¿Continuar?`)) return;
-    $('cleanupOrphansBtn').disabled=true;
-    $('storageAdminStatus').textContent='Eliminando archivos huérfanos…';
-    try{
-      const {data,error}=await supabase.functions.invoke('lectoria-admin',{
-        body:{action:'cleanup_orphans'}
-      });
-      if(error) throw error;
-      if(!data?.ok) throw new Error(data?.error || 'No se pudieron limpiar los archivos.');
-      await renderStorageAdmin();
-      window.alert(`Limpieza terminada. Archivos eliminados: ${data.deletedCount||0}. Espacio recuperado: ${(Number(data.deletedBytes||0)/1048576).toFixed(2)} MB.`);
-    }catch(error){
-      console.error('Error limpiando Storage:',error);
-      $('storageAdminStatus').textContent=`No se pudo completar la limpieza: ${error.message || error}`;
-      $('cleanupOrphansBtn').disabled=false;
-    }
-  });
-
   function renderBooks(){
     const term=$('searchInput').value.toLowerCase();
     const filtered=books.filter(b=>b.title.toLowerCase().includes(term));
@@ -196,52 +137,19 @@
   }
   async function renderContinue(){
     const container=$('continueGrid');
-    container.innerHTML='<p class="continue-message muted">Cargando tus lecturas…</p>';
-
+    container.innerHTML='<p class="muted">Cargando tus lecturas…</p>';
     const {data,error}=await supabase.from('reading_progress')
       .select('book_id,progress_percent,updated_at,page_number')
-      .eq('user_id',currentUser.id)
-      .gt('progress_percent',0)
-      .order('updated_at',{ascending:false});
-
+      .eq('user_id',currentUser.id).order('updated_at',{ascending:false});
     if(error){
-      console.error('Error al cargar reading_progress:',error);
-      container.innerHTML=`
-        <div class="continue-message continue-error">
-          <strong>No se pudieron cargar tus lecturas</strong>
-          <p>${escapeHtml(error.message || 'Error desconocido de Supabase')}</p>
-          <small>Revisa los permisos de lectura de la tabla reading_progress.</small>
-        </div>`;
+      console.error('Error al cargar lecturas:',error);
+      container.innerHTML='<p class="muted">No se pudieron cargar tus lecturas. Comprueba los permisos de reading_progress.</p>';
       return;
     }
-
-    const rows=data||[];
-    const items=rows
-      .map(row=>({book:books.find(book=>book.id===row.book_id),progress:row}))
-      .filter(item=>item.book);
-
-    if(!items.length){
-      container.innerHTML=`
-        <div class="continue-message continue-empty">
-          <strong>Todavía no tienes lecturas en curso</strong>
-          <p>Abre un libro y empieza a leer. Lectoria guardará tu avance automáticamente.</p>
-        </div>`;
-      return;
-    }
-
-    container.innerHTML=items.map(({book,progress})=>`
-      <div class="continue-card">
-        ${card(book)}
-        <div class="continue-progress">
-          <div class="continue-progress-label">
-            <span>Página ${Number(progress.page_number)||1}</span>
-            <span>${Math.round(Number(progress.progress_percent)||0)}%</span>
-          </div>
-          <div class="continue-progress-track">
-            <span style="width:${Math.min(100,Math.max(0,Number(progress.progress_percent)||0))}%"></span>
-          </div>
-        </div>
-      </div>`).join('');
+    const rows=(data||[]).filter(r=>Number(r.progress_percent)>0);
+    const items=rows.map(r=>books.find(b=>b.id===r.book_id)).filter(Boolean);
+    container.innerHTML=items.length ? items.map(card).join('') :
+      '<p class="muted">Todavía no tienes lecturas en curso. Abre un libro y tu progreso aparecerá aquí automáticamente.</p>';
     bindCards(container);
   }
   $('searchInput').addEventListener('input',renderBooks);
@@ -285,188 +193,40 @@
     await restoreProgress();
   }
   async function renderPdfText(url){
-    if(!window.pdfjsLib){
-      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');
-    }
-
-    if(!window.pdfjsLib){
-      show('pdfFallback');
-      $('openPdf').href=url;
-      message('readerStatus','No se pudo cargar PDF.js.');
-      return;
-    }
-
-    pdfjsLib.GlobalWorkerOptions.workerSrc =
-      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    $('readerText').innerHTML='';
+    show('pdfFallback',false);
+    pdfDoc=null;
 
     try{
-      pdfDoc=await pdfjsLib.getDocument(url).promise;
-      $('readerText').innerHTML='';
+      if(!window.pdfjsLib){
+        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');
+      }
+      if(!window.pdfjsLib){
+        showOriginalPdf(url,'No se pudo cargar el lector de PDF.');
+        return;
+      }
 
-      const extractedPages=[];
-      const repeatedEdgeLines=new Map();
+      pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      pdfDoc=await pdfjsLib.getDocument({url,useSystemFonts:true,isEvalSupported:false}).promise;
 
-      // Extraer texto conservando las coordenadas originales del PDF.
+      let hasText=false;
       for(let n=1;n<=pdfDoc.numPages;n++){
         const page=await pdfDoc.getPage(n);
-        const viewport=page.getViewport({scale:1});
         const content=await page.getTextContent();
+        const items=content.items.filter(item=>item.str && item.str.trim());
+        if(items.length) hasText=true;
 
-        const items=content.items
-          .filter(item=>item.str && item.str.trim())
-          .map(item=>({
-            text:item.str.trim(),
-            x:item.transform[4],
-            y:item.transform[5],
-            width:item.width || 0,
-            height:Math.abs(item.transform[3]) || item.height || 10
-          }));
-
-        // Agrupar fragmentos por línea usando su posición vertical.
-        items.sort((a,b)=>{
-          if(Math.abs(b.y-a.y)>2.5) return b.y-a.y;
-          return a.x-b.x;
-        });
-
-        const lines=[];
-        for(const item of items){
-          let line=lines.find(candidate=>
-            Math.abs(candidate.y-item.y)<=Math.max(2.5,item.height*0.3)
-          );
-
-          if(!line){
-            line={y:item.y,height:item.height,items:[]};
-            lines.push(line);
-          }
-
-          line.items.push(item);
-          line.height=Math.max(line.height,item.height);
-        }
-
-        for(const line of lines){
-          line.items.sort((a,b)=>a.x-b.x);
-          let value='';
-          let previous=null;
-
-          for(const item of line.items){
-            if(previous){
-              const gap=item.x-(previous.x+previous.width);
-              // Insertar espacio solo cuando existe separación física entre palabras.
-              if(gap>Math.max(1.2,item.height*0.12)) value+=' ';
-            }
-            value+=item.text;
-            previous=item;
-          }
-
-          line.text=value.replace(/\s+/g,' ').trim();
-        }
-
-        lines.sort((a,b)=>b.y-a.y);
-
-        // Detectar líneas repetidas en los márgenes superior e inferior.
-        const nonEmpty=lines.filter(line=>line.text);
-        nonEmpty.forEach((line,index)=>{
-          if(index<2 || index>=nonEmpty.length-2){
-            const key=normalizePdfLine(line.text);
-            if(key.length>3){
-              repeatedEdgeLines.set(key,(repeatedEdgeLines.get(key)||0)+1);
-            }
-          }
-        });
-
-        extractedPages.push({
-          number:n,
-          height:viewport.height,
-          lines:nonEmpty
-        });
-      }
-
-      // Convertir las líneas en párrafos legibles.
-      for(const pageData of extractedPages){
         const section=document.createElement('section');
-        section.dataset.page=pageData.number;
-
-        const lines=pageData.lines.filter((line,index,array)=>{
-          const value=line.text.trim();
-          const key=normalizePdfLine(value);
-          const edge=index<2 || index>=array.length-2;
-
-          // Eliminar números de página aislados y URLs/editoriales repetitivas.
-          if(/^(p[aá]gina\s*)?\d{1,4}$/i.test(value)) return false;
-          if(/^(https?:\/\/|www\.)/i.test(value)) return false;
-          if(edge && key.length>3 && (repeatedEdgeLines.get(key)||0)>=2) return false;
-
-          return true;
-        });
-
-        const gaps=[];
-        for(let i=1;i<lines.length;i++){
-          const gap=lines[i-1].y-lines[i].y;
-          if(gap>0) gaps.push(gap);
-        }
-
-        const orderedGaps=[...gaps].sort((a,b)=>a-b);
-        const typicalGap=orderedGaps.length
-          ? orderedGaps[Math.floor(orderedGaps.length*0.5)]
-          : 12;
-
-        let paragraph='';
-        let previousLine=null;
-
-        const appendParagraph=()=>{
-          const value=paragraph.trim();
-          if(value){
-            const p=document.createElement('p');
-            p.textContent=value;
-            section.appendChild(p);
-          }
-          paragraph='';
-        };
-
-        for(const line of lines){
-          const value=line.text.trim();
-          if(!value) continue;
-
-          const verticalGap=previousLine
-            ? previousLine.y-line.y
-            : 0;
-
-          const isShortHeading=
-            value.length<=75 &&
-            (
-              /^(cap[ií]tulo|pr[oó]logo|ep[ií]logo|introducci[oó]n|parte\s+\w+)/i.test(value) ||
-              (/^[A-ZÁÉÍÓÚÜÑ0-9\s:.,¡!¿?()-]+$/.test(value) && value.length>=4)
-            );
-
-          const startsNewParagraph=
-            previousLine && verticalGap>Math.max(typicalGap*1.55,typicalGap+3);
-
-          if(isShortHeading || startsNewParagraph){
-            appendParagraph();
-          }
-
-          // Unir palabras cortadas por guion al final de una línea.
-          if(paragraph && /[-\u00ad]$/.test(paragraph)){
-            paragraph=paragraph.replace(/[-\u00ad]$/,'')+value;
-          }else{
-            paragraph+=(paragraph?' ':'')+value;
-          }
-
-          if(isShortHeading) appendParagraph();
-          previousLine=line;
-        }
-
-        appendParagraph();
-
-        if(section.childElementCount){
-          $('readerText').append(section);
-        }
+        section.dataset.page=n;
+        const p=document.createElement('p');
+        p.textContent=items.map(item=>item.str.trim()).filter(Boolean).join(' ');
+        if(p.textContent.trim()) section.appendChild(p);
+        if(section.childElementCount) $('readerText').appendChild(section);
       }
 
-      if(!$('readerText').children.length){
-        message('readerStatus','Este PDF no contiene texto seleccionable. Puedes abrir el PDF original.');
-        show('pdfFallback');
-        $('openPdf').href=url;
+      if(!hasText || !$('readerText').children.length){
+        await renderPdfPagesAsCanvas();
+        message('readerStatus','Este PDF no contiene texto seleccionable. Se muestra conservando su diseño original.');
       }else{
         message('readerStatus','');
       }
@@ -478,20 +238,86 @@
       }
     }catch(e){
       console.error('Error procesando PDF:',e);
-      show('pdfFallback');
-      $('openPdf').href=url;
-      message('readerStatus','No se pudo procesar el texto de este PDF.');
+      if(pdfDoc){
+        try{
+          await renderPdfPagesAsCanvas();
+          message('readerStatus','No se pudo extraer el texto. Se muestra el documento conservando su diseño original.');
+        }catch(renderError){
+          console.error('Error mostrando páginas del PDF:',renderError);
+          showOriginalPdf(url,'No se pudo procesar este PDF dentro del lector.');
+        }
+      }else{
+        showOriginalPdf(url,'No se pudo procesar este PDF dentro del lector.');
+      }
     }
   }
 
+  async function renderPdfPagesAsCanvas(){
+    if(!pdfDoc) throw new Error('No hay un PDF cargado.');
+    const container=$('readerText');
+    container.innerHTML='';
+    container.classList.add('pdf-page-view');
+
+    for(let n=1;n<=pdfDoc.numPages;n++){
+      const page=await pdfDoc.getPage(n);
+      const base=page.getViewport({scale:1});
+      const availableWidth=Math.max(280,container.clientWidth-24);
+      const scale=Math.min(1.6,availableWidth/base.width);
+      const viewport=page.getViewport({scale});
+      const section=document.createElement('section');
+      section.dataset.page=n;
+      section.className='pdf-rendered-page';
+      const canvas=document.createElement('canvas');
+      const ctx=canvas.getContext('2d',{alpha:false});
+      const ratio=Math.min(window.devicePixelRatio||1,1.5);
+      canvas.width=Math.floor(viewport.width*ratio);
+      canvas.height=Math.floor(viewport.height*ratio);
+      canvas.style.width='100%';
+      canvas.style.height='auto';
+      section.appendChild(canvas);
+      container.appendChild(section);
+      await page.render({
+        canvasContext:ctx,
+        viewport,
+        transform:ratio===1?null:[ratio,0,0,ratio,0,0]
+      }).promise;
+    }
+
+    if(!progressListenerAttached){
+      $('readerPage').addEventListener('scroll',saveProgress,{passive:true});
+      window.addEventListener('scroll',saveProgress,{passive:true});
+      progressListenerAttached=true;
+    }
+  }
+
+  function showOriginalPdf(url,reason){
+    $('readerText').innerHTML='';
+    const fallback=$('pdfFallback');
+    fallback.innerHTML=`
+      <p>${escapeHtml(reason)}</p>
+      <iframe title="Documento PDF" src="${url}#toolbar=1&navpanes=0" loading="lazy"
+        style="display:block;width:100%;height:calc(100dvh - 190px);min-height:65vh;border:0;background:#fff"></iframe>
+      <p><a id="openPdf" href="${url}" target="_blank" rel="noopener">Abrir PDF en otra pestaña</a></p>`;
+    show('pdfFallback');
+  }
+
+
+  const pdfReaderStyle=document.createElement('style');
+  pdfReaderStyle.textContent=`
+    .reader-text.pdf-page-view{max-width:100%!important;padding:12px!important}
+    .pdf-rendered-page{width:min(100%,900px);margin:0 auto 22px;background:#fff;overflow:hidden;box-shadow:0 3px 18px rgba(40,25,35,.12)}
+    .pdf-rendered-page canvas{display:block;width:100%;height:auto}
+    #pdfFallback iframe{max-width:100%;background:#fff}
+    @media(max-width:760px){
+      .reader-text.pdf-page-view{padding:6px!important}
+      .pdf-rendered-page{width:100%;margin:0 auto 12px;box-shadow:none}
+      #pdfFallback iframe{height:calc(100dvh - 145px)!important;min-height:75vh!important}
+    }`;
+  document.head.appendChild(pdfReaderStyle);
+
   function loadScript(src){return new Promise(resolve=>{const s=document.createElement('script');s.src=src;s.onload=resolve;s.onerror=resolve;document.head.append(s);});}
   async function restoreProgress(){
-    const {data,error}=await supabase.from('reading_progress').select('page_number').eq('user_id',currentUser.id).eq('book_id',activeBook.id).maybeSingle();
-    if(error){
-      console.error('No se pudo recuperar el progreso:',error);
-      message('readerStatus','El libro abrió, pero no se pudo recuperar tu progreso de lectura.');
-      return;
-    }
+    const {data}=await supabase.from('reading_progress').select('page_number').eq('user_id',currentUser.id).eq('book_id',activeBook.id).maybeSingle();
     if(data?.page_number){
       const el=$('readerText').querySelector(`[data-page="${data.page_number}"]`);
       if(el){
@@ -520,9 +346,6 @@
       if(error) console.error('No se pudo guardar el progreso:',error);
     },650);
   }
-
-  window.addEventListener('pagehide',()=>{if(activeBook) saveProgress();});
-  $('backLibrary').addEventListener('click',()=>{saveProgress();navigate('library');});
 
   $('themeBtn').addEventListener('click',()=>{theme=theme==='light'?'sepia':theme==='sepia'?'dark':'light';$('readerPage').dataset.theme=theme;});
   $('fontPlus').addEventListener('click',()=>{fontSize=Math.min(32,fontSize+1);$('readerText').style.fontSize=fontSize+'px';});
