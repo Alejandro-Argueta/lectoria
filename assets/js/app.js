@@ -1,4 +1,3 @@
-
 (() => {
   const $ = id => document.getElementById(id);
   const cfg = window.LECTORIA_CONFIG || {};
@@ -205,35 +204,200 @@
       return;
     }
 
-    pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
     try{
       pdfDoc=await pdfjsLib.getDocument(url).promise;
+      $('readerText').innerHTML='';
 
+      const extractedPages=[];
+      const repeatedEdgeLines=new Map();
+
+      // Extraer texto conservando las coordenadas originales del PDF.
       for(let n=1;n<=pdfDoc.numPages;n++){
         const page=await pdfDoc.getPage(n);
-        const tc=await page.getTextContent();
-        const texts=tc.items.filter(x=>x.str&&x.str.trim()).map(x=>x.str.trim());
-        const section=document.createElement('section');
-        section.dataset.page=n;
-        const p=document.createElement('p');
-        p.textContent=texts.join(' ');
-        section.append(p);
-        $('readerText').append(section);
+        const viewport=page.getViewport({scale:1});
+        const content=await page.getTextContent();
+
+        const items=content.items
+          .filter(item=>item.str && item.str.trim())
+          .map(item=>({
+            text:item.str.trim(),
+            x:item.transform[4],
+            y:item.transform[5],
+            width:item.width || 0,
+            height:Math.abs(item.transform[3]) || item.height || 10
+          }));
+
+        // Agrupar fragmentos por línea usando su posición vertical.
+        items.sort((a,b)=>{
+          if(Math.abs(b.y-a.y)>2.5) return b.y-a.y;
+          return a.x-b.x;
+        });
+
+        const lines=[];
+        for(const item of items){
+          let line=lines.find(candidate=>
+            Math.abs(candidate.y-item.y)<=Math.max(2.5,item.height*0.3)
+          );
+
+          if(!line){
+            line={y:item.y,height:item.height,items:[]};
+            lines.push(line);
+          }
+
+          line.items.push(item);
+          line.height=Math.max(line.height,item.height);
+        }
+
+        for(const line of lines){
+          line.items.sort((a,b)=>a.x-b.x);
+          let value='';
+          let previous=null;
+
+          for(const item of line.items){
+            if(previous){
+              const gap=item.x-(previous.x+previous.width);
+              // Insertar espacio solo cuando existe separación física entre palabras.
+              if(gap>Math.max(1.2,item.height*0.12)) value+=' ';
+            }
+            value+=item.text;
+            previous=item;
+          }
+
+          line.text=value.replace(/\s+/g,' ').trim();
+        }
+
+        lines.sort((a,b)=>b.y-a.y);
+
+        // Detectar líneas repetidas en los márgenes superior e inferior.
+        const nonEmpty=lines.filter(line=>line.text);
+        nonEmpty.forEach((line,index)=>{
+          if(index<2 || index>=nonEmpty.length-2){
+            const key=normalizePdfLine(line.text);
+            if(key.length>3){
+              repeatedEdgeLines.set(key,(repeatedEdgeLines.get(key)||0)+1);
+            }
+          }
+        });
+
+        extractedPages.push({
+          number:n,
+          height:viewport.height,
+          lines:nonEmpty
+        });
       }
 
-      message('readerStatus','');
+      // Convertir las líneas en párrafos legibles.
+      for(const pageData of extractedPages){
+        const section=document.createElement('section');
+        section.dataset.page=pageData.number;
+
+        const lines=pageData.lines.filter((line,index,array)=>{
+          const value=line.text.trim();
+          const key=normalizePdfLine(value);
+          const edge=index<2 || index>=array.length-2;
+
+          // Eliminar números de página aislados y URLs/editoriales repetitivas.
+          if(/^(p[aá]gina\s*)?\d{1,4}$/i.test(value)) return false;
+          if(/^(https?:\/\/|www\.)/i.test(value)) return false;
+          if(edge && key.length>3 && (repeatedEdgeLines.get(key)||0)>=2) return false;
+
+          return true;
+        });
+
+        const gaps=[];
+        for(let i=1;i<lines.length;i++){
+          const gap=lines[i-1].y-lines[i].y;
+          if(gap>0) gaps.push(gap);
+        }
+
+        const orderedGaps=[...gaps].sort((a,b)=>a-b);
+        const typicalGap=orderedGaps.length
+          ? orderedGaps[Math.floor(orderedGaps.length*0.5)]
+          : 12;
+
+        let paragraph='';
+        let previousLine=null;
+
+        const appendParagraph=()=>{
+          const value=paragraph.trim();
+          if(value){
+            const p=document.createElement('p');
+            p.textContent=value;
+            section.appendChild(p);
+          }
+          paragraph='';
+        };
+
+        for(const line of lines){
+          const value=line.text.trim();
+          if(!value) continue;
+
+          const verticalGap=previousLine
+            ? previousLine.y-line.y
+            : 0;
+
+          const isShortHeading=
+            value.length<=75 &&
+            (
+              /^(cap[ií]tulo|pr[oó]logo|ep[ií]logo|introducci[oó]n|parte\s+\w+)/i.test(value) ||
+              (/^[A-ZÁÉÍÓÚÜÑ0-9\s:.,¡!¿?()-]+$/.test(value) && value.length>=4)
+            );
+
+          const startsNewParagraph=
+            previousLine && verticalGap>Math.max(typicalGap*1.55,typicalGap+3);
+
+          if(isShortHeading || startsNewParagraph){
+            appendParagraph();
+          }
+
+          // Unir palabras cortadas por guion al final de una línea.
+          if(paragraph && /[-\u00ad]$/.test(paragraph)){
+            paragraph=paragraph.replace(/[-\u00ad]$/,'')+value;
+          }else{
+            paragraph+=(paragraph?' ':'')+value;
+          }
+
+          if(isShortHeading) appendParagraph();
+          previousLine=line;
+        }
+
+        appendParagraph();
+
+        if(section.childElementCount){
+          $('readerText').append(section);
+        }
+      }
+
+      if(!$('readerText').children.length){
+        message('readerStatus','Este PDF no contiene texto seleccionable. Puedes abrir el PDF original.');
+        show('pdfFallback');
+        $('openPdf').href=url;
+      }else{
+        message('readerStatus','');
+      }
 
       if(!progressListenerAttached){
         window.addEventListener('scroll',saveProgress,{passive:true});
         progressListenerAttached=true;
       }
     }catch(e){
-      console.error(e);
+      console.error('Error procesando PDF:',e);
       show('pdfFallback');
       $('openPdf').href=url;
-      message('readerStatus','Este PDF no permite extraer texto.');
+      message('readerStatus','No se pudo procesar el texto de este PDF.');
     }
+  }
+
+  function normalizePdfLine(text){
+    return String(text||'')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g,'')
+      .replace(/[^\p{L}\p{N}]/gu,'')
+      .trim();
   }
 
   function loadScript(src){
