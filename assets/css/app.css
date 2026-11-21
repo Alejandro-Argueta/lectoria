@@ -197,40 +197,36 @@
 .reader-page:fullscreen .reader-text { max-width: 760px; margin-inline: auto; }
 
 
-/* CONTRASTE CORRECTO PARA EL TEMA OSCURO, TAMBIEN EN PANTALLA COMPLETA */
-.reader-page[data-theme="dark"],
-.reader-page[data-theme="dark"]:fullscreen {
-  background: #17191d !important;
-  color: #f3f0e9 !important;
+/* Acciones de biblioteca */
+.book-card-wrap { position: relative; min-width: 0; }
+.book-card-wrap .book-card { width: 100%; }
+.delete-book {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  z-index: 2;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #ffffff8c;
+  border-radius: 50%;
+  background: #202833d9;
+  color: #fff;
+  font: 20px/1 'DM Sans', sans-serif;
+  cursor: pointer;
+  opacity: .92;
 }
-.reader-page[data-theme="dark"] .reader-head {
-  background: #202329 !important;
-  color: #f3f0e9 !important;
-  border-bottom-color: #343941 !important;
-}
-.reader-page[data-theme="dark"] .reader-head strong,
-.reader-page[data-theme="dark"] .reader-head .quiet,
-.reader-page[data-theme="dark"] .reader-controls .quiet {
-  color: #d8dce2 !important;
-}
-.reader-page[data-theme="dark"] .reader-text,
-.reader-page[data-theme="dark"]:fullscreen .reader-text {
-  color: #f0ede6 !important;
-  background: transparent !important;
-}
-.reader-page[data-theme="dark"] .reader-status {
-  color: #c4cad2 !important;
-}
-.reader-page[data-theme="dark"] .settings {
-  background: #252a31 !important;
-  color: #f3f0e9 !important;
-  border-color: #414852 !important;
-}
-.reader-page[data-theme="dark"] .settings select {
-  background: #17191d !important;
-  color: #f3f0e9 !important;
-  border-color: #414852 !important;
-}
-.reader-page[data-theme="dark"] .reader-text a {
-  color: #a9c9ff !important;
+.delete-book:hover { background: #a83f3f; }
+.mobile-logout { display: none; }
+
+@media (max-width: 760px) {
+  .mobile-logout {
+    display: flex !important;
+    flex: 0 0 58px !important;
+    font-size: 10px !important;
+  }
+  .mobile-logout span { font-size: 17px !important; }
+  .sidebar { justify-content: space-between; }
+  .delete-book { width: 32px; height: 32px; top: 6px; right: 6px; }
 }
