@@ -2,6 +2,6 @@
 // La anon/publishable key está diseñada para el cliente; la seguridad real depende de RLS.
 // NUNCA coloques aquí la service_role key.
 window.LECTORIA_CONFIG = {
-  supabaseUrl: "https://oajzbetjqfaxrwgrybqm.supabase.co/rest/v1/",
+  supabaseUrl: "https://oajzbetjqfaxrwgrybqm.supabase.co",
   supabaseAnonKey: "oajzbetjqfaxrwgrybqm"
 };
