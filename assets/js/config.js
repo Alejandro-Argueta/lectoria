@@ -3,5 +3,5 @@
 // NUNCA coloques aquí la service_role key.
 window.LECTORIA_CONFIG = {
   supabaseUrl: "https://oajzbetjqfaxrwgrybqm.supabase.co",
-  supabaseAnonKey: "oajzbetjqfaxrwgrybqm"
+  supabaseAnonKey: "sb_publishable_-OUSWAokBuLYGTpCn--KqQ_aTQu58WD"
 };
