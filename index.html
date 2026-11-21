@@ -29,7 +29,7 @@
       <button class="nav-item active" data-page="library"> <span>▤</span> Todos los libros</button>
       <button class="nav-item" data-page="continue"><span>◷</span> Continuar leyendo</button>
       <div id="adminNav" class="hidden">
-        <p class="nav-label">ADMINISTRACIÓN</p>
+        <p class="nav-label">BIBLIOTECA COMPARTIDA</p>
         <button class="nav-item" data-page="admin"><span>＋</span> Importar libros</button>
       </div>
       <div class="sidebar-bottom">
@@ -53,7 +53,7 @@
       </section>
 
       <section id="adminPage" class="page hidden">
-        <div class="page-heading"><div><p class="eyebrow">ADMINISTRACIÓN</p><h1>Importar libros</h1><p class="muted">Selecciona varios PDF. El título se toma del nombre del archivo.</p></div></div>
+        <div class="page-heading"><div><p class="eyebrow">ADMINISTRACIÓN</p><h1>Importar libros</h1><p class="muted">Cualquiera de las dos cuentas puede incorporar libros PDF a la biblioteca compartida. El título se toma del nombre del archivo.</p></div></div>
         <div class="upload-panel">
           <label id="dropzone" class="dropzone" for="pdfInput"><span class="cloud">⇧</span><strong>Arrastra tus PDF aquí</strong><span class="muted">o selecciona varios archivos</span><small>PDF · hasta 50 MB por archivo</small><input id="pdfInput" type="file" accept="application/pdf,.pdf" multiple></label>
           <div id="selectedFiles" class="selected-files"></div>
@@ -63,7 +63,7 @@
       </section>
 
       <section id="readerPage" class="reader-page hidden">
-        <header class="reader-head"><button id="backLibrary" class="quiet">← Biblioteca</button><strong id="readerTitle"></strong><div class="reader-controls"><button id="themeBtn" class="quiet">Tema</button><button id="fontMinus" class="quiet">A−</button><button id="fontPlus" class="quiet">A+</button><button id="readerSettings" class="quiet">Ajustes</button></div></header>
+        <header class="reader-head"><button id="backLibrary" class="quiet">← Biblioteca</button><strong id="readerTitle"></strong><div class="reader-controls"><button id="themeBtn" class="quiet">Tema</button><button id="fontMinus" class="quiet">A−</button><button id="fontPlus" class="quiet">A+</button><button id="readerSettings" class="quiet">Ajustes</button><button id="readerFullscreen" class="quiet fullscreen-btn" type="button" aria-label="Pantalla completa" title="Pantalla completa">⛶</button></div></header>
         <div id="readerSettingsPanel" class="settings hidden">
           <label>Tipografía<select id="fontSelect"><option value="Georgia">Georgia</option><option value="Arial">Arial</option><option value="Palatino Linotype">Palatino</option><option value="Verdana">Verdana</option></select></label>
           <label>Interlineado<select id="lineSelect"><option value="1.5">Compacto</option><option value="1.8" selected>Normal</option><option value="2">Amplio</option></select></label>
