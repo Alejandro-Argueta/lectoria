@@ -70,24 +70,31 @@
       </button>${remove}</div>`;
   }
   function bindCards(container){
-    // Delegación de eventos: sigue funcionando aunque las tarjetas se vuelvan a dibujar.
-    if(container.dataset.cardsBound === '1') return;
-    container.dataset.cardsBound = '1';
-    container.addEventListener('click', event => {
-      const deleteButton = event.target.closest('[data-delete-book]');
-      if(deleteButton && container.contains(deleteButton)){
+    // Asignación directa al botón de borrar. No depende del bubbling del contenedor.
+    container.querySelectorAll('[data-delete-book]').forEach(button=>{
+      if(button.dataset.deleteBound === '1') return;
+      button.dataset.deleteBound = '1';
+    });
+    container.querySelectorAll('[data-book]').forEach(button=>{
+      if(button.dataset.openBound === '1') return;
+      button.dataset.openBound = '1';
+      button.addEventListener('click', event=>{
         event.preventDefault();
-        event.stopPropagation();
-        deleteBook(deleteButton.dataset.deleteBook);
-        return;
-      }
-      const bookButton = event.target.closest('[data-book]');
-      if(bookButton && container.contains(bookButton)){
-        event.preventDefault();
-        openBook(bookButton.dataset.book);
-      }
+        openBook(button.dataset.book);
+      });
     });
   }
+
+  // Respaldo global en fase capture para navegadores que alteren la propagación del clic.
+  document.addEventListener('click', event=>{
+    const button=event.target.closest && event.target.closest('[data-delete-book]');
+    if(!button) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    if(button.dataset.deleteFallbackHandled === '1') return;
+    button.dataset.deleteFallbackHandled = '1';
+    deleteBook(button.dataset.deleteBook);
+  }, true);
 
   async function deleteBook(id){
     if(!isAdmin()){
