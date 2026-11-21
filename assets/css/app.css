@@ -195,3 +195,42 @@
 .reader-page:fullscreen { width: 100%; height: 100%; overflow-y: auto; background: #f4f1eb; }
 .reader-page:fullscreen .reader-head { position: sticky; top: 0; }
 .reader-page:fullscreen .reader-text { max-width: 760px; margin-inline: auto; }
+
+
+/* CONTRASTE CORRECTO PARA EL TEMA OSCURO, TAMBIEN EN PANTALLA COMPLETA */
+.reader-page[data-theme="dark"],
+.reader-page[data-theme="dark"]:fullscreen {
+  background: #17191d !important;
+  color: #f3f0e9 !important;
+}
+.reader-page[data-theme="dark"] .reader-head {
+  background: #202329 !important;
+  color: #f3f0e9 !important;
+  border-bottom-color: #343941 !important;
+}
+.reader-page[data-theme="dark"] .reader-head strong,
+.reader-page[data-theme="dark"] .reader-head .quiet,
+.reader-page[data-theme="dark"] .reader-controls .quiet {
+  color: #d8dce2 !important;
+}
+.reader-page[data-theme="dark"] .reader-text,
+.reader-page[data-theme="dark"]:fullscreen .reader-text {
+  color: #f0ede6 !important;
+  background: transparent !important;
+}
+.reader-page[data-theme="dark"] .reader-status {
+  color: #c4cad2 !important;
+}
+.reader-page[data-theme="dark"] .settings {
+  background: #252a31 !important;
+  color: #f3f0e9 !important;
+  border-color: #414852 !important;
+}
+.reader-page[data-theme="dark"] .settings select {
+  background: #17191d !important;
+  color: #f3f0e9 !important;
+  border-color: #414852 !important;
+}
+.reader-page[data-theme="dark"] .reader-text a {
+  color: #a9c9ff !important;
+}
