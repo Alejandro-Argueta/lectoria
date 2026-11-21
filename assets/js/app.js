@@ -36,7 +36,9 @@
     const {error}=await supabase.auth.signInWithPassword({email:$('email').value.trim(),password:$('password').value});
     if(error) message('loginError','No se pudo iniciar sesión. Revisa tus credenciales.',true);
   });
-  $('logoutBtn').addEventListener('click',()=>supabase.auth.signOut());
+  const signOut = async () => { await supabase.auth.signOut(); };
+  $('logoutBtn').addEventListener('click',signOut);
+  $('logoutMobileBtn').addEventListener('click',signOut);
   document.querySelectorAll('[data-page]').forEach(b=>b.addEventListener('click',()=>navigate(b.dataset.page)));
   $('importShortcut').addEventListener('click',()=>navigate('admin'));
   $('backLibrary').addEventListener('click',()=>navigate('library'));
@@ -57,9 +59,45 @@
     books=data||[];renderBooks();
   }
   function card(book){
-    return `<button class="book-card" data-book="${book.id}"><div class="cover"><span class="cover-monogram">L.</span><strong>${escapeHtml(book.title)}</strong><small>LECTORIA · PDF</small></div><span class="book-card-title">${escapeHtml(book.title)}</span><small class="muted">PDF · ${(book.file_size/1048576).toFixed(1)} MB</small></button>`;
+    const remove = isAdmin()
+      ? `<button class="delete-book" type="button" data-delete-book="${book.id}" aria-label="Eliminar ${escapeHtml(book.title)}" title="Eliminar libro">×</button>`
+      : '';
+    return `<div class="book-card-wrap">
+      <button class="book-card" data-book="${book.id}" type="button">
+        <div class="cover"><span class="cover-monogram">L.</span><strong>${escapeHtml(book.title)}</strong><small>LECTORIA · PDF</small></div>
+        <span class="book-card-title">${escapeHtml(book.title)}</span>
+        <small class="muted">PDF · ${(book.file_size/1048576).toFixed(1)} MB</small>
+      </button>${remove}</div>`;
   }
-  function bindCards(container){container.querySelectorAll('[data-book]').forEach(b=>b.addEventListener('click',()=>openBook(b.dataset.book)));}
+  function bindCards(container){
+    container.querySelectorAll('[data-book]').forEach(b=>b.addEventListener('click',()=>openBook(b.dataset.book)));
+    container.querySelectorAll('[data-delete-book]').forEach(b=>b.addEventListener('click',e=>{
+      e.stopPropagation(); deleteBook(b.dataset.deleteBook);
+    }));
+  }
+
+  async function deleteBook(id){
+    if(!isAdmin()) return;
+    const book=books.find(item=>item.id===id);
+    if(!book) return;
+    const size=(book.file_size/1048576).toFixed(1);
+    if(!window.confirm(`¿Eliminar "${book.title}"?\n\nSe borrará el PDF de Supabase Storage y se liberarán aproximadamente ${size} MB. También se eliminará el progreso de lectura de ambas cuentas. Esta acción no se puede deshacer.`)) return;
+
+    const {error:storageError}=await supabase.storage.from('books').remove([book.storage_path]);
+    if(storageError){
+      window.alert(`No se pudo eliminar el archivo PDF: ${storageError.message}`);
+      return;
+    }
+    const {error:dbError}=await supabase.from('books').delete().eq('id',id);
+    if(dbError){
+      window.alert(`El archivo se eliminó, pero no se pudo borrar el registro del libro: ${dbError.message}. Contacta al administrador para corregirlo.`);
+      return;
+    }
+    if(activeBook?.id===id){activeBook=null;show('readerPage',false);navigate('library');}
+    await loadBooks();
+    renderContinue();
+    message('uploadStatus',`Libro eliminado. Se liberaron aproximadamente ${size} MB.`);
+  }
   function renderBooks(){
     const term=$('searchInput').value.toLowerCase();
     const filtered=books.filter(b=>b.title.toLowerCase().includes(term));
