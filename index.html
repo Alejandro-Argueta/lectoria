@@ -55,6 +55,22 @@
 
       <section id="adminPage" class="page hidden">
         <div class="page-heading"><div><p class="eyebrow">ADMINISTRACIÓN</p><h1>Importar libros</h1><p class="muted">Cualquiera de las dos cuentas puede incorporar libros PDF a la biblioteca compartida. El título se toma del nombre del archivo.</p></div></div>
+        <section id="storageAdminPanel" class="storage-admin-panel hidden">
+          <h2>Almacenamiento</h2>
+          <p class="muted">Controla los PDF guardados en la biblioteca compartida.</p>
+          <div class="storage-admin-stats">
+            <div class="storage-stat"><strong id="storageUsed">—</strong><span>Espacio usado en books</span></div>
+            <div class="storage-stat"><strong id="storageFiles">—</strong><span>Archivos PDF</span></div>
+            <div class="storage-stat"><strong id="storageOrphans">—</strong><span>Archivos huérfanos</span></div>
+          </div>
+          <div class="storage-progress"><span id="storageProgress"></span></div>
+          <ul id="storageOrphanList" class="storage-orphans"></ul>
+          <div class="storage-admin-actions">
+            <button id="refreshStorageBtn" class="quiet" type="button">Actualizar consumo</button>
+            <button id="cleanupOrphansBtn" class="primary" type="button" disabled>Limpiar archivos huérfanos</button>
+          </div>
+          <p id="storageAdminStatus" class="storage-admin-status" aria-live="polite">Consultando almacenamiento…</p>
+        </section>
         <div class="upload-panel">
           <label id="dropzone" class="dropzone" for="pdfInput"><span class="cloud">⇧</span><strong>Arrastra tus PDF aquí</strong><span class="muted">o selecciona varios archivos</span><small>PDF · hasta 50 MB por archivo</small><input id="pdfInput" type="file" accept="application/pdf,.pdf" multiple></label>
           <div id="selectedFiles" class="selected-files"></div>
@@ -79,6 +95,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./assets/js/config.js"></script>
-  <script src="./assets/js/app.js?v=deletefix4"></script>
+  <script src="./assets/js/app.js"></script>
 </body>
 </html>
