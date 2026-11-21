@@ -57,6 +57,7 @@
     const {data,error}=await supabase.from('books').select('id,title,original_name,storage_path,file_size,created_at').order('created_at',{ascending:false});
     if(error){console.error(error);return;}
     books=data||[];renderBooks();
+    if(isAdmin() && $('storageAdminPanel')) await renderStorageAdmin();
   }
   function card(book){
     const remove = isAdmin()
@@ -96,25 +97,20 @@
     }
     const book=books.find(item=>item.id===id);
     if(!book){
-      window.alert('No se encontró el libro en la biblioteca. Actualiza la página e inténtalo de nuevo.');
+      window.alert('No se encontró el libro. Actualiza la página e inténtalo de nuevo.');
       return;
     }
-    const size=(book.file_size/1048576).toFixed(1);
-    if(!window.confirm(`¿Eliminar "${book.title}"?\\n\\nSe borrará el PDF de Supabase Storage y se liberarán aproximadamente ${size} MB. También se eliminará el progreso de lectura de ambas cuentas. Esta acción no se puede deshacer.`)) return;
+    const size=(Number(book.file_size||0)/1048576).toFixed(1);
+    if(!window.confirm(`¿Eliminar "${book.title}"?\\n\\nSe eliminará el PDF de Storage, el registro del libro y el progreso de lectura de ambas cuentas. Se liberarán aproximadamente ${size} MB.`)) return;
 
-    try {
-      const {error:storageError}=await supabase.storage.from('books').remove([book.storage_path]);
-      if(storageError){
-        console.error('Error eliminando PDF:',storageError);
-        window.alert(`Supabase no permitió eliminar el PDF: ${storageError.message}`);
-        return;
-      }
-      const {error:dbError}=await supabase.from('books').delete().eq('id',id);
-      if(dbError){
-        console.error('Error eliminando registro:',dbError);
-        window.alert(`El PDF se eliminó, pero falló el registro del libro: ${dbError.message}`);
-        return;
-      }
+    const buttons=[...document.querySelectorAll(`[data-delete-book="${CSS.escape(id)}"]`)];
+    buttons.forEach(button=>{button.disabled=true;button.textContent='…';});
+    try{
+      const {data,error}=await supabase.functions.invoke('lectoria-admin',{
+        body:{action:'delete_book',bookId:id}
+      });
+      if(error) throw error;
+      if(!data?.ok) throw new Error(data?.error || 'No se pudo eliminar el libro.');
       if(activeBook?.id===id){
         activeBook=null;
         show('readerPage',false);
@@ -122,12 +118,75 @@
       }
       await loadBooks();
       await renderContinue();
-      message('uploadStatus',`Libro eliminado. Se liberaron aproximadamente ${size} MB.`);
-    } catch(error) {
-      console.error('Fallo inesperado al eliminar libro:',error);
-      window.alert(`No se pudo completar la eliminación: ${error.message || error}`);
+      if(isAdmin()) await renderStorageAdmin();
+      window.alert(data.storageRemoved===false
+        ? 'El registro se eliminó, pero el PDF quedó pendiente de limpieza. Usa «Limpiar archivos huérfanos».'
+        : `Libro eliminado. Se liberaron aproximadamente ${size} MB.`);
+    }catch(error){
+      console.error('Error eliminando libro:',error);
+      window.alert(`No se pudo eliminar el libro: ${error.message || error}`);
+      buttons.forEach(button=>{button.disabled=false;button.textContent='×';});
     }
   }
+
+  async function renderStorageAdmin(){
+    const panel=$('storageAdminPanel');
+    if(!panel || !isAdmin()) return;
+    panel.classList.remove('hidden');
+    const status=$('storageAdminStatus');
+    status.textContent='Consultando almacenamiento…';
+    $('cleanupOrphansBtn').disabled=true;
+    try{
+      const {data,error}=await supabase.functions.invoke('lectoria-admin',{
+        body:{action:'storage_summary'}
+      });
+      if(error) throw error;
+      if(!data?.ok) throw new Error(data?.error || 'No se pudo consultar Storage.');
+      const mb=(Number(data.usedBytes||0)/1048576);
+      const quota=1024;
+      const pct=Math.min(100,mb/quota*100);
+      $('storageUsed').textContent=`${mb.toFixed(2)} MB`;
+      $('storageFiles').textContent=String(data.fileCount||0);
+      $('storageOrphans').textContent=String((data.orphans||[]).length);
+      $('storageProgress').style.width=`${pct}%`;
+      $('storageOrphanList').innerHTML=(data.orphans||[]).length
+        ? data.orphans.map(file=>`<li>${escapeHtml(file.name.split('/').pop())} <span>${(Number(file.size||0)/1048576).toFixed(2)} MB</span></li>`).join('')
+        : '<li class="storage-clean">No hay archivos huérfanos.</li>';
+      status.textContent='El consumo mostrado corresponde al bucket books. La cuota total de la organización puede incluir otros proyectos.';
+      $('cleanupOrphansBtn').disabled=!(data.orphans||[]).length;
+    }catch(error){
+      console.error('Error consultando almacenamiento:',error);
+      status.textContent=`No se pudo consultar Storage: ${error.message || error}. Verifica que la Edge Function lectoria-admin esté desplegada.`;
+      $('storageUsed').textContent='—';
+      $('storageFiles').textContent='—';
+      $('storageOrphans').textContent='—';
+      $('storageOrphanList').innerHTML='';
+    }
+  }
+
+  $('refreshStorageBtn').addEventListener('click',renderStorageAdmin);
+  $('cleanupOrphansBtn').addEventListener('click',async()=>{
+    if(!isAdmin()) return;
+    const count=Number($('storageOrphans').textContent)||0;
+    if(!count) return;
+    if(!window.confirm(`Se encontraron ${count} PDF sin registro en la biblioteca.\\n\\nSe eliminarán únicamente esos archivos huérfanos del bucket books. Los libros registrados no se tocarán. ¿Continuar?`)) return;
+    $('cleanupOrphansBtn').disabled=true;
+    $('storageAdminStatus').textContent='Eliminando archivos huérfanos…';
+    try{
+      const {data,error}=await supabase.functions.invoke('lectoria-admin',{
+        body:{action:'cleanup_orphans'}
+      });
+      if(error) throw error;
+      if(!data?.ok) throw new Error(data?.error || 'No se pudieron limpiar los archivos.');
+      await renderStorageAdmin();
+      window.alert(`Limpieza terminada. Archivos eliminados: ${data.deletedCount||0}. Espacio recuperado: ${(Number(data.deletedBytes||0)/1048576).toFixed(2)} MB.`);
+    }catch(error){
+      console.error('Error limpiando Storage:',error);
+      $('storageAdminStatus').textContent=`No se pudo completar la limpieza: ${error.message || error}`;
+      $('cleanupOrphansBtn').disabled=false;
+    }
+  });
+
   function renderBooks(){
     const term=$('searchInput').value.toLowerCase();
     const filtered=books.filter(b=>b.title.toLowerCase().includes(term));
