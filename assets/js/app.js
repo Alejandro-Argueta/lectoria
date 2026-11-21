@@ -41,7 +41,7 @@
   $('logoutMobileBtn').addEventListener('click',signOut);
   document.querySelectorAll('[data-page]').forEach(b=>b.addEventListener('click',()=>navigate(b.dataset.page)));
   $('importShortcut').addEventListener('click',()=>navigate('admin'));
-  $('backLibrary').addEventListener('click',()=>navigate('library'));
+  $('backLibrary').addEventListener('click',()=>{saveProgress();navigate('library');});
 
   function navigate(page){
     ['libraryPage','continuePage','adminPage','readerPage'].forEach(id=>show(id,false));
@@ -105,11 +105,22 @@
     $('bookCount').textContent=`${books.length} libros`;
     show('emptyState',books.length===0);bindCards($('bookGrid'));
   }
-  function renderContinue(){
-    supabase.from('reading_progress').select('book_id,progress_percent,updated_at').eq('user_id',currentUser.id).gt('progress_percent',0).order('updated_at',{ascending:false}).then(({data})=>{
-      const rows=data||[];const items=rows.map(r=>books.find(b=>b.id===r.book_id)).filter(Boolean);
-      $('continueGrid').innerHTML=items.map(card).join('')||'<p class="muted">Todavía no tienes lecturas en curso.</p>';bindCards($('continueGrid'));
-    });
+  async function renderContinue(){
+    const container=$('continueGrid');
+    container.innerHTML='<p class="muted">Cargando tus lecturas…</p>';
+    const {data,error}=await supabase.from('reading_progress')
+      .select('book_id,progress_percent,updated_at,page_number')
+      .eq('user_id',currentUser.id).order('updated_at',{ascending:false});
+    if(error){
+      console.error('Error al cargar lecturas:',error);
+      container.innerHTML='<p class="muted">No se pudieron cargar tus lecturas. Comprueba los permisos de reading_progress.</p>';
+      return;
+    }
+    const rows=(data||[]).filter(r=>Number(r.progress_percent)>0);
+    const items=rows.map(r=>books.find(b=>b.id===r.book_id)).filter(Boolean);
+    container.innerHTML=items.length ? items.map(card).join('') :
+      '<p class="muted">Todavía no tienes lecturas en curso. Abre un libro y tu progreso aparecerá aquí automáticamente.</p>';
+    bindCards(container);
   }
   $('searchInput').addEventListener('input',renderBooks);
 
@@ -166,24 +177,39 @@
         const p=document.createElement('p');p.textContent=texts.join(' ');section.append(p);$('readerText').append(section);
       }
       message('readerStatus','');
-      if(!progressListenerAttached){window.addEventListener('scroll',saveProgress,{passive:true});progressListenerAttached=true;}
+      if(!progressListenerAttached){window.addEventListener('scroll',saveProgress,{passive:true});$('readerPage').addEventListener('scroll',saveProgress,{passive:true});progressListenerAttached=true;}
     }catch(e){console.error(e);show('pdfFallback');$('openPdf').href=url;message('readerStatus','Este PDF no permite extraer texto.');}
   }
   function loadScript(src){return new Promise(resolve=>{const s=document.createElement('script');s.src=src;s.onload=resolve;s.onerror=resolve;document.head.append(s);});}
   async function restoreProgress(){
     const {data}=await supabase.from('reading_progress').select('page_number').eq('user_id',currentUser.id).eq('book_id',activeBook.id).maybeSingle();
-    if(data?.page_number){const el=$('readerText').querySelector(`[data-page="${data.page_number}"]`);el?.scrollIntoView();}
+    if(data?.page_number){
+      const el=$('readerText').querySelector(`[data-page="${data.page_number}"]`);
+      if(el){
+        const reader=$('readerPage');
+        if(window.matchMedia('(max-width: 760px)').matches) reader.scrollTo({top:el.offsetTop-reader.offsetTop-58,behavior:'auto'});
+        else el.scrollIntoView({behavior:'auto',block:'start'});
+      }
+    } else { saveProgress(); }
   }
   function saveProgress(){
-    if(!activeBook)return;
+    if(!activeBook || !pdfDoc || !currentUser) return;
     clearTimeout(progressTimer);
     progressTimer=setTimeout(async()=>{
+      const reader=$('readerPage');
       const sections=[...$('readerText').querySelectorAll('[data-page]')];
-      const current=sections.find(s=>s.getBoundingClientRect().bottom>120);
-      if(!current)return;
-      const percent=Math.min(100,Math.round((Number(current.dataset.page)/pdfDoc.numPages)*10000)/100);
-      await supabase.from('reading_progress').upsert({user_id:currentUser.id,book_id:activeBook.id,page_number:Number(current.dataset.page),progress_percent:percent},{onConflict:'user_id,book_id'});
-    },900);
+      if(!sections.length) return;
+      const mobile=window.matchMedia('(max-width: 760px)').matches;
+      const edge=mobile ? reader.getBoundingClientRect().top+58 : 95;
+      const current=sections.find(section=>section.getBoundingClientRect().bottom>edge) || sections[sections.length-1];
+      const pageNumber=Number(current.dataset.page);
+      const percent=Math.min(100,Math.max(0,Math.round((pageNumber/pdfDoc.numPages)*10000)/100));
+      const {error}=await supabase.from('reading_progress').upsert({
+        user_id:currentUser.id,book_id:activeBook.id,page_number:pageNumber,
+        progress_percent:percent,updated_at:new Date().toISOString()
+      },{onConflict:'user_id,book_id'});
+      if(error) console.error('No se pudo guardar el progreso:',error);
+    },650);
   }
 
   $('themeBtn').addEventListener('click',()=>{theme=theme==='light'?'sepia':theme==='sepia'?'dark':'light';$('readerPage').dataset.theme=theme;});
